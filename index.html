@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AR лабораторная</title>
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js" onload="window.arjsOk=true" onerror="window.arjsFail=true"></script>
   <script>
     // Журнал на экране, чтобы видеть, что именно происходит
     function log(text) {
@@ -15,9 +15,9 @@
     window.addEventListener('error', function (e) { log('JS-ошибка: ' + e.message); });
 
     window.addEventListener('DOMContentLoaded', function () {
-      log('v4');
+      log('v5');
       log('A-Frame: ' + (window.AFRAME ? AFRAME.version : 'НЕ загружен'));
-      log('AR.js: ' + (typeof THREEx !== 'undefined' ? 'ok' : 'НЕ загружен'));
+      log('AR.js: ' + (window.arjsOk ? 'скрипт загружен' : (window.arjsFail ? 'ОШИБКА загрузки скрипта' : 'скрипт ещё грузится')));
 
       // Проверка: доступен ли файл модели по сети
       const t0 = Date.now();
