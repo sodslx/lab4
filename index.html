@@ -4,65 +4,56 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AR лабораторная</title>
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js" onload="window.arjsOk=true" onerror="window.arjsFail=true"></script>
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <script>
-    // Журнал на экране, чтобы видеть, что именно происходит
+    // Журнал показывается только если открыть страницу со словом ?debug в конце ссылки
+    const DEBUG = location.search.indexOf('debug') !== -1;
     function log(text) {
+      if (!DEBUG) return;
       const el = document.getElementById('log');
-      if (el) el.innerHTML += text + '<br>';
+      if (el) { el.style.display = 'block'; el.innerHTML += text + '<br>'; }
     }
     window.addEventListener('error', function (e) { log('JS-ошибка: ' + e.message); });
 
-    window.addEventListener('DOMContentLoaded', function () {
-      log('v5');
-      log('A-Frame: ' + (window.AFRAME ? AFRAME.version : 'НЕ загружен'));
-      log('AR.js: ' + (window.arjsOk ? 'скрипт загружен' : (window.arjsFail ? 'ОШИБКА загрузки скрипта' : 'скрипт ещё грузится')));
+    // Габариты модели в системе координат самой сущности (не зависят от положения маркера)
+    function localBox(entityObj, root) {
+      root.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(entityObj.matrixWorld).invert();
+      const box = new THREE.Box3();
+      root.traverse(function (node) {
+        if (node.geometry) {
+          node.geometry.computeBoundingBox();
+          const b = node.geometry.boundingBox.clone();
+          b.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, node.matrixWorld));
+          box.union(b);
+        }
+      });
+      return box;
+    }
 
-      // Проверка: доступен ли файл модели по сети
-      const t0 = Date.now();
-      fetch('model.glb')
-        .then(function (r) {
-          log('model.glb: HTTP ' + r.status);
-          return r.arrayBuffer();
-        })
-        .then(function (b) {
-          log('model.glb: получено ' + Math.round(b.byteLength / 1024) + ' КБ за ' + ((Date.now() - t0) / 1000).toFixed(1) + ' с');
-        })
-        .catch(function (e) { log('model.glb: ошибка сети ' + e.message); });
-
-      const scene = document.querySelector('a-scene');
-      if (scene) scene.addEventListener('loaded', function () { log('сцена: loaded'); });
-
-      setTimeout(function () {
-        if (!window.modelDone) log('модель не ответила за 20 с');
-      }, 20000);
-    });
-
-    // Подгоняет модель под размер маркера и ставит её на маркер
+    // Подгоняет модель под размер маркера и ставит её на маркер по центру
     AFRAME.registerComponent('fit-model', {
       schema: { size: { default: 1 } },
       init: function () {
-        this.el.addEventListener('model-error', function (e) {
-          window.modelDone = true;
-          log('модель: ОШИБКА разбора ' + (e.detail && e.detail.src ? '' : ''));
-        });
+        this.el.addEventListener('model-error', function () { log('модель: ОШИБКА загрузки'); });
         this.el.addEventListener('model-loaded', () => {
-          window.modelDone = true;
-          log('модель: loaded');
-          const obj = this.el.getObject3D('mesh');
-          if (!obj) { log('модель: нет mesh'); return; }
-          const box = new THREE.Box3().setFromObject(obj);
-          const dim = box.getSize(new THREE.Vector3());
+          const root = this.el.getObject3D('mesh');
+          if (!root) { log('модель: нет mesh'); return; }
+          const entityObj = this.el.object3D;
+
+          const b1 = localBox(entityObj, root);
+          const dim = b1.getSize(new THREE.Vector3());
           const max = Math.max(dim.x, dim.y, dim.z);
           log('размер модели: ' + dim.x.toFixed(2) + ' x ' + dim.y.toFixed(2) + ' x ' + dim.z.toFixed(2));
           if (!max) return;
-          obj.scale.multiplyScalar(this.data.size / max);
-          const box2 = new THREE.Box3().setFromObject(obj);
-          const c = box2.getCenter(new THREE.Vector3());
-          obj.position.x -= c.x;
-          obj.position.z -= c.z;
-          obj.position.y -= box2.min.y;
+
+          root.scale.multiplyScalar(this.data.size / max);
+          const b2 = localBox(entityObj, root);
+          const c = b2.getCenter(new THREE.Vector3());
+          root.position.x -= c.x;
+          root.position.z -= c.z;
+          root.position.y -= b2.min.y;
           log('готово. Наведи камеру на маркер Hiro');
         });
       }
@@ -70,7 +61,7 @@
   </script>
 </head>
 <body style="margin: 0; overflow: hidden;">
-  <div id="log" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  <div id="log" style="display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
        padding: 6px; font: 12px monospace; color: #fff; background: rgba(0,0,0,0.7);"></div>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
