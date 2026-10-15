@@ -14,13 +14,7 @@
     <a-marker preset="hiro">
       <!-- Твоя модель: положи файл model.glb рядом с index.html -->
       <!-- Если модель слишком большая или маленькая, меняй scale -->
-      <a-entity
-        gltf-model="url(model.glb)"
-        scale="0.1 0.1 0.1"
-        position="0 0 0"
-        rotation="0 0 0"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear">
-      </a-entity>
+      <a-box position="0 0.5 0" material="color: red"></a-box>
     </a-marker>
 
     <a-entity camera></a-entity>
