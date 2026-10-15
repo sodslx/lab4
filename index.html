@@ -7,42 +7,71 @@
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
   <script>
-    function setStatus(text, color) {
-      const s = document.getElementById('status');
-      if (s) { s.textContent = text; s.style.background = color; }
+    // Журнал на экране, чтобы видеть, что именно происходит
+    function log(text) {
+      const el = document.getElementById('log');
+      if (el) el.innerHTML += text + '<br>';
     }
+    window.addEventListener('error', function (e) { log('JS-ошибка: ' + e.message); });
 
-    // Подгоняет модель под размер маркера, ставит её на маркер и пишет статус загрузки
+    window.addEventListener('DOMContentLoaded', function () {
+      log('v4');
+      log('A-Frame: ' + (window.AFRAME ? AFRAME.version : 'НЕ загружен'));
+      log('AR.js: ' + (typeof THREEx !== 'undefined' ? 'ok' : 'НЕ загружен'));
+
+      // Проверка: доступен ли файл модели по сети
+      const t0 = Date.now();
+      fetch('model.glb')
+        .then(function (r) {
+          log('model.glb: HTTP ' + r.status);
+          return r.arrayBuffer();
+        })
+        .then(function (b) {
+          log('model.glb: получено ' + Math.round(b.byteLength / 1024) + ' КБ за ' + ((Date.now() - t0) / 1000).toFixed(1) + ' с');
+        })
+        .catch(function (e) { log('model.glb: ошибка сети ' + e.message); });
+
+      const scene = document.querySelector('a-scene');
+      if (scene) scene.addEventListener('loaded', function () { log('сцена: loaded'); });
+
+      setTimeout(function () {
+        if (!window.modelDone) log('модель не ответила за 20 с');
+      }, 20000);
+    });
+
+    // Подгоняет модель под размер маркера и ставит её на маркер
     AFRAME.registerComponent('fit-model', {
       schema: { size: { default: 1 } },
       init: function () {
-        this.el.addEventListener('model-error', () => {
-          setStatus('Ошибка: model.glb не загрузилась (проверь имя и путь файла)', '#b00020');
+        this.el.addEventListener('model-error', function (e) {
+          window.modelDone = true;
+          log('модель: ОШИБКА разбора ' + (e.detail && e.detail.src ? '' : ''));
         });
         this.el.addEventListener('model-loaded', () => {
+          window.modelDone = true;
+          log('модель: loaded');
           const obj = this.el.getObject3D('mesh');
-          if (!obj) return;
+          if (!obj) { log('модель: нет mesh'); return; }
           const box = new THREE.Box3().setFromObject(obj);
           const dim = box.getSize(new THREE.Vector3());
           const max = Math.max(dim.x, dim.y, dim.z);
-          if (!max) { setStatus('Модель загружена, но пустая', '#b00020'); return; }
+          log('размер модели: ' + dim.x.toFixed(2) + ' x ' + dim.y.toFixed(2) + ' x ' + dim.z.toFixed(2));
+          if (!max) return;
           obj.scale.multiplyScalar(this.data.size / max);
           const box2 = new THREE.Box3().setFromObject(obj);
           const c = box2.getCenter(new THREE.Vector3());
           obj.position.x -= c.x;
           obj.position.z -= c.z;
           obj.position.y -= box2.min.y;
-          setStatus('Модель загружена. Наведи камеру на маркер Hiro', '#1b5e20');
+          log('готово. Наведи камеру на маркер Hiro');
         });
       }
     });
   </script>
 </head>
 <body style="margin: 0; overflow: hidden;">
-  <div id="status" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
-       padding: 8px; font: 14px sans-serif; color: #fff; background: #555;">
-    v3: загрузка модели…
-  </div>
+  <div id="log" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+       padding: 6px; font: 12px monospace; color: #fff; background: rgba(0,0,0,0.7);"></div>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
     <a-marker preset="hiro">
